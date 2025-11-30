@@ -210,3 +210,75 @@ struct parse_token{
     Token peek;
 } ParseToken;
 
+#define peek_token (ParseToken.peek)
+#define cur_token (ParseToken.cur)
+#define next_token(state) do {ParseToken.cur = ParseToken.peek, ParseToken.peek = lex(state);} while (0)
+#define init_token(state) do {ParseToken.cur = lex(state), ParseToken.peek = lex(state);} while (0)
+
+static inline Symbol * make_terminal(Token tok, int line_no){
+    Symbol * sym = NULL;
+    if (map_get(SymbolTable, tok.ptr, cur_token.len, 
+                (void *) &sym) == -1) {
+        sym = symbol_alloc();
+        if (sym == NULL){
+            return NULL;
+        }
+        sym->is_defined = false;
+        sym->token = tok;
+        sym->sym_type = TERM;
+        sym->productive = true;
+        sym->visited = false;
+        sym->productions = NULL;
+        sym->next = ParseInfo.terminals;
+        ParseInfo.terminals = sym;
+        ParseInfo.terminal_counts++;
+    } 
+    return sym;
+}
+
+static inline Symbol * make_non_terminal(Token tok, int line_no){
+    Symbol * sym = NULL;
+    if (map_get(SymbolTable, tok.ptr, tok.len, (void **) &sym) == -1){
+        sym = symbol_alloc();
+        if (sym == NULL){
+            return NULL;
+        }
+        sym->is_defined = false;
+        sym->productions = NULL;
+        sym->productive = false;
+        sym->sym_type = NONTERM;
+        sym->visited = false;
+        sym->token = cur_token;
+        sym->next = ParseInfo.non_terminals;
+        ParseInfo.non_terminals = sym;
+        ParseInfo.non_terminal_counts++;
+    }
+    if (sym->sym_type == TERM){
+        fprintf(stderr, "Error: Can't redefined previous terminal as terminal in line %d\n", line_no);
+        return NULL;
+    }
+    return sym;
+}
+
+
+int parse(Reader * state){
+    init_token(state);
+    bool err_state = false;
+    while (cur_token.type != TOK_EOF && cur_token.type !=TOK_ERROR && !err_state){
+        switch((int)cur_token.type){
+            case TOK_IDENT:
+               if(parse_formulation(state) != 0) return -1;
+                next_token(state);
+                break;
+            case TOK_TOKEN:
+                if (parse_token(state) != 0) return -1;
+                next_token(state);
+                break;
+            case TOK_START:
+                if (parse_start(state) != 0) return -1;
+                next_token(state);
+                break;
+        }
+    }
+    return 0;
+}
