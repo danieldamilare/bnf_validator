@@ -151,3 +151,62 @@ Token lex(Reader * file){
         }
     }
 }
+
+/* parsing state */
+typedef struct rule Rule;
+typedef struct Symbol{
+    enum {TERM, NONTERM} sym_type;
+    bool visited;
+    bool productive;
+    bool is_defined;
+    Token token;
+    Rule * productions;
+    struct Symbol * next;
+} Symbol;
+
+typedef struct rule{
+    int len;
+    int value;
+    Symbol * formulations[50]; // A wild guess, a grammar wouldn't probably reach 50 productions without pipe
+    struct rule * next;
+} Rule;
+
+struct parse_info{
+    Symbol * start_symbol;
+    Symbol * terminals;
+    Symbol * non_terminals;
+    int terminal_counts;
+    int non_terminal_counts;
+    bool set_start;
+}ParseInfo;
+
+#define MAXPOOL 4098
+Symbol SymbolPool[MAXPOOL];
+int symbol_idx;
+Rule RulePool[MAXPOOL];
+int rule_idx;
+
+//todo: make reentrant
+static inline Symbol * symbol_alloc(){
+    if (symbol_idx >= MAXPOOL){
+        fprintf(stderr, "Error: Symbols too many\n");
+        return NULL;
+    }
+    return &SymbolPool[symbol_idx++];
+}
+
+static inline Rule * rule_alloc(){
+    if (rule_idx >= MAXPOOL){
+        fprintf(stderr, "Error: Rule too many\n");
+        return NULL;
+    }
+    return &RulePool[rule_idx++];
+}
+
+Map * SymbolTable;
+
+struct parse_token{
+    Token cur;
+    Token peek;
+} ParseToken;
+
